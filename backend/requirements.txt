@@ -1,0 +1,6 @@
+pycryptodome==3.20.0
+pyaes==1.6.1
+cryptography>=42.0.0
+sqlalchemy==2.0.30
+aiosqlite==0.20.0
+aiofiles==24.1.0

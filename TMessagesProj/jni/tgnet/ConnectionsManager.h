@@ -225,7 +225,7 @@ private:
     int32_t currentNetworkType = NETWORK_TYPE_WIFI;
     uint32_t currentVersion = 1;
     int32_t currentLayer = 34;
-    int32_t currentApiId = 6;
+    int32_t currentApiId = 0; // Custom server — no Telegram API ID
     std::string currentDeviceModel;
     std::string currentSystemVersion;
     std::string currentAppVersion;
