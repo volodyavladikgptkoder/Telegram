@@ -123,15 +123,18 @@ class ClientConnection:
         logger.info(f"New connection from {self.addr}")
         try:
             await self._detect_transport()
+            logger.info(f"{self.addr}: Transport detected: type={self.transport_type}, obfuscated={self._obfuscated}")
             while True:
                 data = await self._read_message()
                 if data is None:
+                    logger.info(f"{self.addr}: No more data (read returned None)")
                     break
+                logger.info(f"{self.addr}: Received message, len={len(data)}, first_bytes={data[:8].hex() if len(data) >= 8 else data.hex()}")
                 await self._process_message(data)
-        except asyncio.IncompleteReadError:
-            pass
+        except asyncio.IncompleteReadError as e:
+            logger.info(f"{self.addr}: IncompleteReadError: {e}")
         except ConnectionResetError:
-            pass
+            logger.info(f"{self.addr}: ConnectionResetError")
         except Exception as e:
             logger.error(f"Connection error from {self.addr}: {e}")
             traceback.print_exc()
@@ -194,7 +197,8 @@ class ClientConnection:
         else:
             self.transport_type = TRANSPORT_ABRIDGED
 
-        logger.debug(f"{self.addr}: Obfuscated transport detected, protocol=0x{marker:08x}, type={self.transport_type}")
+        logger.info(f"{self.addr}: Obfuscated transport detected, protocol=0x{marker:08x}, type={self.transport_type}")
+        logger.info(f"{self.addr}: decrypt_key={decrypt_key[:8].hex()}..., decrypt_iv={bytes(decrypt_iv).hex()}")
 
     async def _detect_plain_transport(self, header: bytes):
         """Legacy non-obfuscated transport detection."""
