@@ -13,6 +13,8 @@ import asyncio
 import struct
 import logging
 import traceback
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 
 from mtproto_server.handshake import HandshakeState, handle_req_pq_multi, handle_req_dh_params, handle_set_client_dh_params
 from mtproto_server.handshake import CID_REQ_PQ_MULTI, CID_REQ_DH_PARAMS, CID_SET_CLIENT_DH_PARAMS
@@ -97,6 +99,10 @@ class ClientConnection:
         self.seq_no = 0
         self.addr = writer.get_extra_info('peername')
         self._current_handshake = None
+        # Obfuscated transport AES-CTR state
+        self._decrypt_encryptor = None  # for decrypting incoming data
+        self._encrypt_encryptor = None  # for encrypting outgoing data
+        self._obfuscated = False
 
     async def _push_update(self, update_data: bytes):
         """Send an update to this client through its existing encrypted connection."""
@@ -137,97 +143,147 @@ class ClientConnection:
             logger.info(f"Connection closed from {self.addr}")
 
     async def _detect_transport(self):
-        """Detect transport type from the first byte(s)."""
-        first_byte = await self.reader.read(1)
-        if not first_byte:
-            raise ConnectionResetError()
+        """Detect transport type, handling obfuscated (64-byte header) connections."""
+        header = await self.reader.readexactly(64)
 
-        b = first_byte[0]
-        if b == 0xef:
+        # Check if this looks like an obfuscated header.
+        # Obfuscated headers have 64 random bytes where bytes[56:60] encode the protocol
+        # after decryption.  We detect obfuscation by trying to decrypt and checking
+        # the protocol marker.
+        first4 = struct.unpack('<I', header[:4])[0]
+        second4 = struct.unpack('<I', header[4:8])[0]
+
+        # Plain-text markers that would appear in non-obfuscated connections
+        plain_markers = {0xefefefef, 0xeeeeeeee, 0xdddddddd, 0x44414548, 0x54534f50, 0x20544547, 0x4954504f, 0x02010316}
+        if first4 in plain_markers or header[0] == 0xef or second4 == 0x00000000:
+            # Non-obfuscated: fall back to legacy detection
+            await self._detect_plain_transport(header)
+            return
+
+        # Obfuscated transport: derive keys from the 64-byte init payload
+        # Server decrypt key (= client encrypt key): bytes[8:40] key, bytes[40:56] IV
+        decrypt_key = header[8:40]
+        decrypt_iv = bytearray(header[40:56])
+
+        # Server encrypt key (= client decrypt key): reverse of bytes[8:56]
+        rev = header[55:7:-1]  # bytes 55,54,...,8  (48 bytes)
+        encrypt_key = bytes(rev[:32])
+        encrypt_iv = bytearray(rev[32:48])
+
+        # Build AES-CTR decryptor
+        dec_cipher = Cipher(algorithms.AES(decrypt_key), modes.CTR(bytes(decrypt_iv)), backend=default_backend())
+        self._decrypt_encryptor = dec_cipher.encryptor()
+
+        # Decrypt the original 64 bytes to read the protocol marker
+        decrypted_header = self._decrypt_encryptor.update(header)
+
+        # Build AES-CTR encryptor
+        enc_cipher = Cipher(algorithms.AES(encrypt_key), modes.CTR(bytes(encrypt_iv)), backend=default_backend())
+        self._encrypt_encryptor = enc_cipher.encryptor()
+
+        self._obfuscated = True
+
+        # Protocol marker is at decrypted bytes [56:60]
+        marker = struct.unpack('<I', decrypted_header[56:60])[0]
+        if marker == 0xefefefef:
             self.transport_type = TRANSPORT_ABRIDGED
-            logger.debug(f"{self.addr}: Using abridged transport")
-        elif b == 0xee:
-            # Read next 3 bytes (eeeeeeee prefix)
-            rest = await self.reader.readexactly(3)
-            if rest == b'\xee\xee\xee':
-                self.transport_type = TRANSPORT_INTERMEDIATE
-                logger.debug(f"{self.addr}: Using intermediate transport")
-            else:
-                self.transport_type = TRANSPORT_INTERMEDIATE
-                logger.debug(f"{self.addr}: Using intermediate transport")
-        elif b == 0xdd:
-            await self.reader.readexactly(3)
+        elif marker == 0xeeeeeeee:
+            self.transport_type = TRANSPORT_INTERMEDIATE
+        elif marker == 0xdddddddd:
             self.transport_type = TRANSPORT_PADDED_INTERMEDIATE
         else:
-            # Check for intermediate (eeeeeeee) or full transport
-            rest = await self.reader.readexactly(3)
-            header = first_byte + rest
-            if header == b'\xee\xee\xee\xee':
-                self.transport_type = TRANSPORT_INTERMEDIATE
-            elif header == b'\xdd\xdd\xdd\xdd':
-                self.transport_type = TRANSPORT_PADDED_INTERMEDIATE
-            else:
-                self.transport_type = TRANSPORT_FULL
-                # The 4 bytes we read are part of the first message
-                # In full transport: length(4) + seqno(4) + data + crc32(4)
-                length = struct.unpack('<I', header)[0]
-                remaining = await self.reader.readexactly(length - 4)
-                data = remaining[4:-4]  # skip seqno, skip crc32
-                await self._process_message(data)
+            self.transport_type = TRANSPORT_ABRIDGED
+
+        logger.debug(f"{self.addr}: Obfuscated transport detected, protocol=0x{marker:08x}, type={self.transport_type}")
+
+    async def _detect_plain_transport(self, header: bytes):
+        """Legacy non-obfuscated transport detection."""
+        b = header[0]
+        if b == 0xef:
+            self.transport_type = TRANSPORT_ABRIDGED
+            # remaining 63 bytes might be part of the first message
+            leftover = header[1:]
+            if leftover:
+                self._plain_leftover = leftover
+        elif header[:4] == b'\xee\xee\xee\xee':
+            self.transport_type = TRANSPORT_INTERMEDIATE
+            leftover = header[4:]
+            if leftover:
+                self._plain_leftover = leftover
+        elif header[:4] == b'\xdd\xdd\xdd\xdd':
+            self.transport_type = TRANSPORT_PADDED_INTERMEDIATE
+            leftover = header[4:]
+            if leftover:
+                self._plain_leftover = leftover
+        else:
+            self.transport_type = TRANSPORT_FULL
+            self._plain_leftover = header
+
+    async def _read_raw(self, n: int) -> bytes:
+        """Read n bytes, decrypting if obfuscated."""
+        data = await self.reader.readexactly(n)
+        if self._obfuscated and self._decrypt_encryptor:
+            data = self._decrypt_encryptor.update(data)
+        return data
 
     async def _read_message(self) -> bytes:
         """Read a single message according to the transport type."""
         try:
             if self.transport_type == TRANSPORT_ABRIDGED:
-                first = await self.reader.readexactly(1)
+                first = await self._read_raw(1)
                 length = first[0]
                 if length >= 0x7f:
-                    length_bytes = await self.reader.readexactly(3)
+                    length_bytes = await self._read_raw(3)
                     length = struct.unpack('<I', length_bytes + b'\x00')[0]
                 length *= 4
-                data = await self.reader.readexactly(length)
+                data = await self._read_raw(length)
                 return data
 
             elif self.transport_type == TRANSPORT_INTERMEDIATE:
-                length_bytes = await self.reader.readexactly(4)
+                length_bytes = await self._read_raw(4)
                 length = struct.unpack('<I', length_bytes)[0]
-                data = await self.reader.readexactly(length)
+                data = await self._read_raw(length)
                 return data
 
             elif self.transport_type == TRANSPORT_PADDED_INTERMEDIATE:
-                length_bytes = await self.reader.readexactly(4)
+                length_bytes = await self._read_raw(4)
                 length = struct.unpack('<I', length_bytes)[0]
-                data = await self.reader.readexactly(length)
+                data = await self._read_raw(length)
                 return data
 
             elif self.transport_type == TRANSPORT_FULL:
-                length_bytes = await self.reader.readexactly(4)
+                length_bytes = await self._read_raw(4)
                 length = struct.unpack('<I', length_bytes)[0]
-                remaining = await self.reader.readexactly(length - 4)
-                # seqno(4) + payload + crc32(4)
+                remaining = await self._read_raw(length - 4)
                 data = remaining[4:-4]
                 return data
 
         except asyncio.IncompleteReadError:
             return None
 
+    def _encrypt_and_write(self, data: bytes):
+        """Write data, encrypting if obfuscated."""
+        if self._obfuscated and self._encrypt_encryptor:
+            data = self._encrypt_encryptor.update(data)
+        self.writer.write(data)
+
     async def _send_message(self, data: bytes):
         """Send a message according to the transport type."""
         if self.transport_type == TRANSPORT_ABRIDGED:
             length = len(data) // 4
             if length < 0x7f:
-                self.writer.write(struct.pack('<B', length))
+                self._encrypt_and_write(struct.pack('<B', length))
             else:
-                self.writer.write(b'\x7f' + struct.pack('<I', length)[:3])
-            self.writer.write(data)
+                self._encrypt_and_write(b'\x7f' + struct.pack('<I', length)[:3])
+            self._encrypt_and_write(data)
 
         elif self.transport_type == TRANSPORT_INTERMEDIATE:
-            self.writer.write(struct.pack('<I', len(data)))
-            self.writer.write(data)
+            self._encrypt_and_write(struct.pack('<I', len(data)))
+            self._encrypt_and_write(data)
 
         elif self.transport_type == TRANSPORT_PADDED_INTERMEDIATE:
-            self.writer.write(struct.pack('<I', len(data)))
-            self.writer.write(data)
+            self._encrypt_and_write(struct.pack('<I', len(data)))
+            self._encrypt_and_write(data)
 
         elif self.transport_type == TRANSPORT_FULL:
             seqno = self.seq_no
@@ -237,7 +293,7 @@ class ClientConnection:
             body = header + data
             import binascii
             crc = binascii.crc32(body)
-            self.writer.write(body + struct.pack('<I', crc))
+            self._encrypt_and_write(body + struct.pack('<I', crc))
 
         await self.writer.drain()
 
