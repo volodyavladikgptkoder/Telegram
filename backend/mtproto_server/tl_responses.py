@@ -928,3 +928,422 @@ def build_langpack_strings() -> bytes:
     s.write_uint32(0x1cb5c415)  # vector
     s.write_int32(0)
     return s.get_bytes()
+
+
+# ============================================================
+# PHONE CALL responses
+# ============================================================
+
+def build_phone_call(call_row, users=None) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xec82e140)  # phone.phoneCall
+    # phoneCallRequested
+    s.write_uint32(0x14b0ed0c)  # phoneCallRequested
+    s.write_int32(1 if call_row.get('is_video') else 0)  # flags (video)
+    s.write_int64(call_row['id'])
+    s.write_int64(call_row['access_hash'] or 0)
+    s.write_int32(call_row['created_at'] or int(time.time()))
+    s.write_int64(call_row['caller_id'])
+    s.write_int64(call_row['callee_id'])
+    s.write_bytes(call_row.get('g_a_hash') or os.urandom(32))
+    # protocol
+    s.write_uint32(0xfc878fc8)  # phoneCallProtocol
+    s.write_int32(3)  # flags (udp_p2p | udp_reflector)
+    s.write_int32(90)  # min_layer
+    s.write_int32(92)  # max_layer
+    s.write_uint32(0x1cb5c415)  # library_versions
+    s.write_int32(1)
+    s.write_string("5.0.0")
+    # users
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(len(users) if users else 0)
+    if users:
+        for u in users:
+            _write_user(s, u)
+    return s.get_bytes()
+
+
+def build_phone_call_discarded(call_id: int) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xec82e140)  # phone.phoneCall
+    s.write_uint32(0x50ca4de1)  # phoneCallDiscarded
+    s.write_int32(0)  # flags
+    s.write_int64(call_id)
+    s.write_uint32(0x1cb5c415)  # users
+    s.write_int32(0)
+    return s.get_bytes()
+
+
+# ============================================================
+# SECRET CHAT responses
+# ============================================================
+
+def build_encrypted_chat_requested(chat) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x48f1d94c)  # encryptedChatRequested
+    s.write_int32(0)  # flags
+    s.write_int32(chat['id'])
+    s.write_int64(chat['access_hash'] or 0)
+    s.write_int32(chat['created_at'] or int(time.time()))
+    s.write_int64(chat['creator_id'])
+    s.write_int64(chat['participant_id'])
+    s.write_bytes(chat.get('g_a') or os.urandom(256))
+    return s.get_bytes()
+
+
+def build_encrypted_chat(chat) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x61f0d4c7)  # encryptedChat
+    s.write_int32(chat['id'])
+    s.write_int64(chat['access_hash'] or 0)
+    s.write_int32(chat['created_at'] or int(time.time()))
+    s.write_int64(chat['creator_id'])
+    s.write_int64(chat['participant_id'])
+    s.write_bytes(chat.get('g_a') or os.urandom(256))
+    s.write_int64(chat.get('key_fingerprint') or 0)
+    return s.get_bytes()
+
+
+def build_messages_dh_config(random_bytes: bytes) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xc0e24635)  # messages.dhConfigNotModified
+    s.write_bytes(random_bytes)
+    return s.get_bytes()
+
+
+def build_messages_sent_encrypted_message() -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x560f8935)  # messages.sentEncryptedMessage
+    s.write_int32(int(time.time()))  # date
+    return s.get_bytes()
+
+
+# ============================================================
+# BOT responses
+# ============================================================
+
+def build_bot_callback_answer(message: str = "", alert: bool = False) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x36585ea4)  # messages.botCallbackAnswer
+    flags = 0
+    if alert:
+        flags |= 2
+    if message:
+        flags |= 1
+    s.write_int32(flags)
+    if message:
+        s.write_string(message)
+    s.write_int32(0)  # cache_time
+    return s.get_bytes()
+
+
+def build_bot_results_empty() -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xe021f2f6)  # messages.botResults
+    s.write_int32(0)  # flags
+    s.write_int64(0)  # query_id
+    s.write_uint32(0x1cb5c415)  # results
+    s.write_int32(0)
+    s.write_int32(300)  # cache_time
+    s.write_uint32(0x1cb5c415)  # users
+    s.write_int32(0)
+    return s.get_bytes()
+
+
+# ============================================================
+# DRAFTS responses
+# ============================================================
+
+def build_affected_history(pts: int, offset: int = 0) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xb45c69d1)  # messages.affectedHistory
+    s.write_int32(pts)
+    s.write_int32(1)  # pts_count
+    s.write_int32(offset)
+    return s.get_bytes()
+
+
+# ============================================================
+# DIALOG FILTERS responses
+# ============================================================
+
+def build_dialog_filters(filters) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x1cb5c415)  # vector
+    s.write_int32(len(filters))
+    for f in filters:
+        s.write_uint32(0x7438f7e8)  # dialogFilter
+        flags = f['flags'] if f['flags'] else 0
+        s.write_int32(flags)
+        s.write_int32(f['id'])
+        s.write_string(f['title'] or '')
+        if f.get('emoticon'):
+            s.write_string(f['emoticon'])
+        # pinned_peers (empty vector)
+        s.write_uint32(0x1cb5c415)
+        s.write_int32(0)
+        # include_peers (empty vector)
+        s.write_uint32(0x1cb5c415)
+        s.write_int32(0)
+        # exclude_peers (empty vector)
+        s.write_uint32(0x1cb5c415)
+        s.write_int32(0)
+    return s.get_bytes()
+
+
+def build_dialog_unread_marks() -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x1cb5c415)  # vector
+    s.write_int32(0)
+    return s.get_bytes()
+
+
+# ============================================================
+# SCHEDULED MESSAGES responses
+# ============================================================
+
+def build_scheduled_messages(messages, users) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x8c718e87)  # messages.messages
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(len(messages))
+    for msg in messages:
+        _write_message(s, msg)
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(0)
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(len(users))
+    for u in users:
+        _write_user(s, u)
+    return s.get_bytes()
+
+
+# ============================================================
+# FORUM TOPICS responses
+# ============================================================
+
+def build_forum_topics(topics, messages=None, users=None, chats=None) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x367617d3)  # messages.forumTopics
+    s.write_int32(0)  # flags (not order_by_create_date)
+    s.write_int32(len(topics))  # count
+    # topics
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(len(topics))
+    for t in topics:
+        s.write_uint32(0x71701da9)  # forumTopic
+        flags = 0
+        if t.get('is_pinned'):
+            flags |= 4
+        if t.get('is_closed'):
+            flags |= 8
+        s.write_int32(flags)
+        s.write_int32(t['id'])
+        s.write_int32(t['created_at'] or int(time.time()))
+        s.write_string(t['title'] or '')
+        s.write_int32(t.get('icon_color') or 0x6FB9F0)
+        s.write_int64(t.get('icon_emoji_id') or 0)
+        s.write_int32(t.get('top_message_id') or 0)
+        s.write_int32(0)  # read_inbox_max_id
+        s.write_int32(0)  # read_outbox_max_id
+        s.write_int32(t.get('unread_count') or 0)
+        s.write_int32(0)  # unread_mentions_count
+        s.write_int32(0)  # unread_reactions_count
+        # from_id: peerUser
+        s.write_uint32(0x59511722)
+        s.write_int64(t['creator_id'])
+        # notifySettings
+        s.write_uint32(0xaf509d20)
+        s.write_int32(0)
+    # messages
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(len(messages) if messages else 0)
+    if messages:
+        for msg in messages:
+            _write_message(s, msg)
+    # chats
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(len(chats) if chats else 0)
+    # users
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(len(users) if users else 0)
+    if users:
+        for u in users:
+            _write_user(s, u)
+    return s.get_bytes()
+
+
+# ============================================================
+# GROUP CALL responses
+# ============================================================
+
+def build_group_call(call, participants=None) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x9e727aad)  # phone.groupCall
+    # groupCall
+    s.write_uint32(0xd597650c)  # groupCall
+    flags = 0
+    s.write_int32(flags)
+    s.write_int64(call['id'])
+    s.write_int64(call['access_hash'] or 0)
+    s.write_int32(call.get('participant_count') or 0)
+    s.write_string(call.get('title') or '')
+    s.write_int32(0)  # stream_dc_id
+    s.write_int32(0)  # record_start_date
+    s.write_int32(0)  # version
+    # participants
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(0)
+    s.write_string("")  # params
+    # chats
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(0)
+    # users
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(0)
+    return s.get_bytes()
+
+
+def build_group_call_empty() -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x9e727aad)  # phone.groupCall
+    s.write_uint32(0x7780bcb4)  # groupCallDiscarded
+    s.write_int64(0)
+    s.write_int64(0)
+    s.write_int32(0)
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(0)
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(0)
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(0)
+    return s.get_bytes()
+
+
+def build_group_participants(participants, users) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xf47751b6)  # phone.groupParticipants
+    s.write_int32(len(participants))  # count
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(len(participants))
+    for p in participants:
+        s.write_uint32(0xeba636fe)  # groupCallParticipant
+        s.write_int32(0)  # flags
+        s.write_uint32(0x59511722)  # peerUser
+        s.write_int64(p['user_id'])
+        s.write_int32(p['joined_at'] or int(time.time()))
+        s.write_int32(0)  # volume
+    # chats
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(0)
+    # users
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(len(users))
+    for u in users:
+        _write_user(s, u)
+    s.write_string("")  # next_offset
+    return s.get_bytes()
+
+
+# ============================================================
+# ACCOUNT TTL responses
+# ============================================================
+
+def build_account_days_ttl(days: int) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xb8d0afdf)  # accountDaysTTL
+    s.write_int32(days)
+    return s.get_bytes()
+
+
+def build_global_privacy_settings() -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x734c4ccb)  # globalPrivacySettings
+    s.write_int32(0)  # flags
+    return s.get_bytes()
+
+
+# ============================================================
+# IMPORT responses
+# ============================================================
+
+def build_checked_history_import_peer() -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xa480b51d)  # messages.checkedHistoryImportPeer
+    s.write_string("")  # confirm_text
+    return s.get_bytes()
+
+
+def build_history_import_init(import_id: int) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x1662af0b)  # messages.historyImport
+    s.write_int64(import_id)
+    return s.get_bytes()
+
+
+# ============================================================
+# REAL-TIME UPDATES
+# ============================================================
+
+def build_update_new_message(msg, pts: int, users=None) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x74ae4240)  # updates
+    # updates vector
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(1)
+    # updateNewMessage
+    s.write_uint32(0x1f2b0afd)
+    _write_message(s, msg)
+    s.write_int32(pts)
+    s.write_int32(1)  # pts_count
+    # users vector
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(len(users) if users else 0)
+    if users:
+        for u in users:
+            _write_user(s, u)
+    # chats vector
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(0)
+    s.write_int32(int(time.time()))  # date
+    s.write_int32(0)  # seq
+    return s.get_bytes()
+
+
+def build_update_user_typing(user_id: int, peer_id: int) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x74ae4240)  # updates
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(1)
+    s.write_uint32(0xc01e857f)  # updateUserTyping
+    s.write_int64(user_id)
+    s.write_uint32(0x16bf744e)  # sendMessageTypingAction
+    s.write_uint32(0x1cb5c415)  # users
+    s.write_int32(0)
+    s.write_uint32(0x1cb5c415)  # chats
+    s.write_int32(0)
+    s.write_int32(int(time.time()))
+    s.write_int32(0)
+    return s.get_bytes()
+
+
+def build_update_read_history(peer_id: int, max_id: int, pts: int) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x74ae4240)  # updates
+    s.write_uint32(0x1cb5c415)
+    s.write_int32(1)
+    s.write_uint32(0x9c974fdf)  # updateReadHistoryInbox
+    s.write_int32(0)  # flags
+    s.write_uint32(0x59511722)  # peerUser
+    s.write_int64(peer_id)
+    s.write_int32(max_id)
+    s.write_int32(0)  # still_unread_count
+    s.write_int32(pts)
+    s.write_int32(1)  # pts_count
+    s.write_uint32(0x1cb5c415)  # users
+    s.write_int32(0)
+    s.write_uint32(0x1cb5c415)  # chats
+    s.write_int32(0)
+    s.write_int32(int(time.time()))
+    s.write_int32(0)
+    return s.get_bytes()

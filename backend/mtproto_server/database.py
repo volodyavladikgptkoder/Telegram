@@ -260,6 +260,115 @@ def init_db():
         seq INTEGER DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS phone_calls (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        access_hash INTEGER DEFAULT 0,
+        caller_id INTEGER NOT NULL,
+        callee_id INTEGER NOT NULL,
+        g_a_hash BLOB,
+        g_a BLOB,
+        g_b BLOB,
+        protocol_json TEXT,
+        state TEXT DEFAULT 'requested',
+        reason TEXT,
+        duration INTEGER DEFAULT 0,
+        is_video INTEGER DEFAULT 0,
+        rating INTEGER,
+        comment TEXT,
+        created_at INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS encrypted_chats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        access_hash INTEGER DEFAULT 0,
+        creator_id INTEGER NOT NULL,
+        participant_id INTEGER NOT NULL,
+        g_a BLOB,
+        g_b BLOB,
+        key_fingerprint INTEGER DEFAULT 0,
+        state TEXT DEFAULT 'requested',
+        created_at INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS drafts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        peer_type TEXT NOT NULL,
+        peer_id INTEGER NOT NULL,
+        message TEXT,
+        reply_to_msg_id INTEGER,
+        entities_json TEXT,
+        date INTEGER DEFAULT 0,
+        UNIQUE(user_id, peer_type, peer_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS dialog_filters (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        emoticon TEXT,
+        flags INTEGER DEFAULT 0,
+        include_peers_json TEXT DEFAULT '[]',
+        exclude_peers_json TEXT DEFAULT '[]',
+        pinned_peers_json TEXT DEFAULT '[]',
+        order_pos INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS scheduled_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id INTEGER NOT NULL,
+        sender_id INTEGER NOT NULL,
+        text TEXT,
+        media_json TEXT,
+        schedule_date INTEGER NOT NULL,
+        reply_to_id INTEGER,
+        entities_json TEXT,
+        is_sent INTEGER DEFAULT 0,
+        created_at INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS forum_topics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        channel_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        icon_color INTEGER DEFAULT 0,
+        icon_emoji_id INTEGER DEFAULT 0,
+        creator_id INTEGER NOT NULL,
+        top_message_id INTEGER DEFAULT 0,
+        unread_count INTEGER DEFAULT 0,
+        is_pinned INTEGER DEFAULT 0,
+        is_closed INTEGER DEFAULT 0,
+        created_at INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS group_calls (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        access_hash INTEGER DEFAULT 0,
+        chat_id INTEGER NOT NULL,
+        title TEXT,
+        creator_id INTEGER NOT NULL,
+        participant_count INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
+        schedule_date INTEGER,
+        created_at INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS group_call_participants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        call_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        is_muted INTEGER DEFAULT 0,
+        is_video INTEGER DEFAULT 0,
+        joined_at INTEGER DEFAULT 0,
+        UNIQUE(call_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS account_settings (
+        user_id INTEGER PRIMARY KEY,
+        account_ttl_days INTEGER DEFAULT 365,
+        global_privacy_json TEXT DEFAULT '{}'
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_chat ON messages(chat_id, date);
     CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
     CREATE INDEX IF NOT EXISTS idx_dialogs_user ON dialogs(user_id);
@@ -267,6 +376,9 @@ def init_db():
     CREATE INDEX IF NOT EXISTS idx_chat_members_chat ON chat_members(chat_id);
     CREATE INDEX IF NOT EXISTS idx_chat_members_user ON chat_members(user_id);
     CREATE INDEX IF NOT EXISTS idx_auth_keys_user ON auth_keys(user_id);
+    CREATE INDEX IF NOT EXISTS idx_drafts_user ON drafts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_scheduled_date ON scheduled_messages(schedule_date);
+    CREATE INDEX IF NOT EXISTS idx_forum_topics_channel ON forum_topics(channel_id);
     """)
     conn.commit()
     logger.info(f"Database initialized at {DB_PATH}")

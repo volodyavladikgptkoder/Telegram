@@ -33,6 +33,8 @@ class MTProtoMessage:
         self.seq_no = 0
         self.data = b''
         self.constructor = 0
+        self.session_id = 0
+        self.server_salt = 0
 
 
 def parse_unencrypted_message(raw_data: bytes) -> MTProtoMessage:
@@ -82,8 +84,8 @@ def decrypt_message(raw_data: bytes, auth_key: bytes) -> MTProtoMessage:
 
     # Parse decrypted data
     inner_reader = TLDeserializer(decrypted)
-    server_salt = inner_reader.read_int64()
-    session_id = inner_reader.read_int64()
+    msg.server_salt = inner_reader.read_int64()
+    msg.session_id = inner_reader.read_int64()
     msg.msg_id = inner_reader.read_int64()
     msg.seq_no = inner_reader.read_int32()
     data_length = inner_reader.read_int32()

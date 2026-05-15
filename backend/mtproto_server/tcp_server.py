@@ -33,6 +33,53 @@ TRANSPORT_INTERMEDIATE = 2
 TRANSPORT_PADDED_INTERMEDIATE = 3
 TRANSPORT_FULL = 4
 
+# ============================================================
+# Connection Registry for real-time push
+# ============================================================
+# Maps user_id -> set of ClientConnection objects
+_user_connections: dict[int, set] = {}
+_connections_lock = asyncio.Lock() if hasattr(asyncio, 'Lock') else None
+import collections
+_rate_limits: dict[int, list] = collections.defaultdict(list)
+RATE_LIMIT_WINDOW = 1.0  # seconds
+RATE_LIMIT_MAX = 30  # max requests per window
+
+
+def _register_connection(user_id: int, conn):
+    if user_id not in _user_connections:
+        _user_connections[user_id] = set()
+    _user_connections[user_id].add(conn)
+    logger.info(f"Registered connection for user {user_id}, total: {len(_user_connections[user_id])}")
+
+
+def _unregister_connection(user_id: int, conn):
+    if user_id in _user_connections:
+        _user_connections[user_id].discard(conn)
+        if not _user_connections[user_id]:
+            del _user_connections[user_id]
+        logger.info(f"Unregistered connection for user {user_id}")
+
+
+def push_update_to_user(user_id: int, update_data: bytes):
+    """Push an update to all connections of a user (called from handlers)."""
+    if user_id not in _user_connections:
+        return
+    for conn in list(_user_connections[user_id]):
+        asyncio.ensure_future(conn._push_update(update_data))
+
+
+def _check_rate_limit(user_id: int) -> bool:
+    """Returns True if within rate limit, False if exceeded."""
+    import time
+    now = time.time()
+    timestamps = _rate_limits[user_id]
+    # Remove old entries
+    _rate_limits[user_id] = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
+    if len(_rate_limits[user_id]) >= RATE_LIMIT_MAX:
+        return False
+    _rate_limits[user_id].append(now)
+    return True
+
 
 class ClientConnection:
     """Manages state for a single client TCP connection."""
@@ -51,6 +98,21 @@ class ClientConnection:
         self.addr = writer.get_extra_info('peername')
         self._current_handshake = None
 
+    async def _push_update(self, update_data: bytes):
+        """Send an update to this client through its existing encrypted connection."""
+        if not self.auth_key or not self.session_id:
+            return
+        try:
+            encrypted = encrypt_message(
+                update_data, self.auth_key, self.session_id,
+                self.server_salt, seq_no=self.seq_no
+            )
+            self.seq_no += 2
+            await self._send_message(encrypted)
+            logger.debug(f"Pushed update to user {self.user_id}")
+        except Exception as e:
+            logger.error(f"Failed to push update to user {self.user_id}: {e}")
+
     async def handle(self):
         logger.info(f"New connection from {self.addr}")
         try:
@@ -68,6 +130,9 @@ class ClientConnection:
             logger.error(f"Connection error from {self.addr}: {e}")
             traceback.print_exc()
         finally:
+            # Unregister from connection registry
+            if self.user_id:
+                _unregister_connection(self.user_id, self)
             self.writer.close()
             logger.info(f"Connection closed from {self.addr}")
 
@@ -85,8 +150,8 @@ class ClientConnection:
             # Read next 3 bytes (eeeeeeee prefix)
             rest = await self.reader.readexactly(3)
             if rest == b'\xee\xee\xee':
-                self.transport_type = TRANSPORT_PADDED_INTERMEDIATE
-                logger.debug(f"{self.addr}: Using padded intermediate transport")
+                self.transport_type = TRANSPORT_INTERMEDIATE
+                logger.debug(f"{self.addr}: Using intermediate transport")
             else:
                 self.transport_type = TRANSPORT_INTERMEDIATE
                 logger.debug(f"{self.addr}: Using intermediate transport")
@@ -259,7 +324,8 @@ class ClientConnection:
             logger.error(f"Failed to decrypt message: {e}")
             return
 
-        self.session_id = struct.unpack_from('<q', raw_data[24:], 8)[0] if len(raw_data) > 32 else 0
+        self.session_id = msg.session_id
+        self.server_salt = msg.server_salt
 
         ctx = RPCContext(
             user_id=self.user_id,
@@ -272,15 +338,36 @@ class ClientConnection:
 
         # Update user_id if changed during auth
         if ctx.user_id and ctx.user_id != self.user_id:
+            old_user_id = self.user_id
             self.user_id = ctx.user_id
+            # Update connection registry
+            if old_user_id:
+                _unregister_connection(old_user_id, self)
+            _register_connection(self.user_id, self)
             conn = db.get_db()
             conn.execute("UPDATE auth_keys SET user_id = ? WHERE auth_key_id = ?",
                          (self.user_id, self.auth_key_id))
             conn.commit()
+        elif ctx.user_id and self.user_id:
+            # Ensure we're registered
+            if self.user_id not in _user_connections or self not in _user_connections.get(self.user_id, set()):
+                _register_connection(self.user_id, self)
 
     async def _process_rpc(self, data: bytes, msg_id: int, ctx: RPCContext):
         """Process an RPC request and send the response."""
         if len(data) < 4:
+            return
+
+        # Rate limiting
+        if self.user_id and not _check_rate_limit(self.user_id):
+            logger.warning(f"Rate limit exceeded for user {self.user_id}")
+            error_response = build_rpc_result(msg_id, build_rpc_error(420, "FLOOD_WAIT_1"))
+            encrypted = encrypt_message(
+                error_response, self.auth_key, self.session_id or 0,
+                self.server_salt, seq_no=self.seq_no
+            )
+            self.seq_no += 2
+            await self._send_message(encrypted)
             return
 
         constructor = struct.unpack_from('<I', data, 0)[0]
@@ -308,14 +395,26 @@ class ClientConnection:
         if actual_constructor == MSGS_ACK:
             return
 
+        # Constructors whose responses must NOT be wrapped in rpc_result
+        BARE_RESPONSE_CONSTRUCTORS = {
+            0x7abe77ec,  # ping
+            0xf3427b8c,  # ping_delay_disconnect
+            0xb921bd04,  # get_future_salts
+            0xe7512126,  # destroy_session
+            0x58e4a740,  # rpc_drop_answer
+        }
+
         # Dispatch to handler
         response = dispatch_rpc(actual_constructor, actual_data if actual_data is not data else data, ctx)
 
         if response is None:
             return
 
-        # Wrap in rpc_result
-        result_data = build_rpc_result(msg_id, response)
+        # Service messages are sent bare, RPC calls are wrapped in rpc_result
+        if actual_constructor in BARE_RESPONSE_CONSTRUCTORS:
+            result_data = response
+        else:
+            result_data = build_rpc_result(msg_id, response)
 
         # Encrypt and send
         encrypted = encrypt_message(
