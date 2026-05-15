@@ -21,8 +21,8 @@ public class BuildVars {
     public static boolean DEBUG_VERSION = BuildConfig.DEBUG_VERSION;
     public static boolean LOGS_ENABLED = BuildConfig.DEBUG_VERSION;
     public static boolean DEBUG_PRIVATE_VERSION = BuildConfig.DEBUG_PRIVATE_VERSION;
-    public static boolean USE_CLOUD_STRINGS = true;
-    public static boolean CHECK_UPDATES = true;
+    public static boolean USE_CLOUD_STRINGS = false; // Disabled — custom server
+    public static boolean CHECK_UPDATES = false; // Disabled — custom server
     public static boolean NO_SCOPED_STORAGE = Build.VERSION.SDK_INT <= 29;
     public static String BUILD_VERSION_STRING = BuildConfig.BUILD_VERSION_STRING;
 
@@ -35,13 +35,13 @@ public class BuildVars {
     public static String HUAWEI_STORE_URL = "";
     public static String GOOGLE_AUTH_CLIENT_ID = ""; // Removed — custom server
 
-    public static String HUAWEI_APP_ID = "101184875";
+    public static String HUAWEI_APP_ID = "";
 
     // You can use this flag to disable Google Play Billing (If you're making fork and want it to be in Google Play)
     public static boolean IS_BILLING_UNAVAILABLE = false;
 
-    // works only on official app ids, disable on your forks
-    public static boolean SUPPORTS_PASSKEYS = true;
+    // Disabled — custom server, no Telegram passkeys support
+    public static boolean SUPPORTS_PASSKEYS = false;
 
     static {
         if (ApplicationLoader.applicationContext != null) {
@@ -93,6 +93,6 @@ public class BuildVars {
     }
 
     public static String getSmsHash() {
-        return ApplicationLoader.isStandaloneBuild() ? "w0lkcmTZkKh" : (DEBUG_VERSION ? "O2P2z+/jBpJ" : "oLeq9AcOZkT");
+        return ""; // Disabled — custom server handles auth codes
     }
 }

@@ -1945,6 +1945,390 @@ def handle_account_get_global_privacy_settings(data: bytes, ctx: RPCContext) -> 
 
 
 # ============================================================
+# Additional stub handlers
+# ============================================================
+
+def handle_account_get_notify_settings(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xdbbaedcb)  # peerNotifySettings
+    s.write_int32(0)  # flags — no overrides
+    return s.get_bytes()
+
+def handle_account_update_notify_settings(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_account_get_notify_exceptions(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_updates_empty()
+
+def handle_account_get_contact_sign_up_notification(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(False)
+
+def handle_account_set_contact_sign_up_notification(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_account_get_default_emoji_statuses(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xd08ce645)  # account.emojiStatusesNotModified
+    return s.get_bytes()
+
+def handle_account_get_themes(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xf41eb622)  # account.themesNotModified
+    return s.get_bytes()
+
+def handle_account_get_content_settings(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x57e28221)  # account.contentSettings
+    s.write_int32(0)  # flags
+    return s.get_bytes()
+
+def handle_account_confirm_phone(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_account_reset_authorization(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_account_get_saved_ringtones(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xfbf6e4b1)  # account.savedRingtonesNotModified
+    return s.get_bytes()
+
+def handle_account_get_channel_default_emoji_statuses(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xd08ce645)  # account.emojiStatusesNotModified
+    return s.get_bytes()
+
+def handle_account_get_recent_emoji_statuses(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xd08ce645)  # account.emojiStatusesNotModified
+    return s.get_bytes()
+
+# --- Messages additional stubs ---
+
+def handle_messages_get_peer_settings(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x6880b94d)  # messages.peerSettings
+    s.write_uint32(0xa518110d)  # peerSettings
+    s.write_int32(0)  # flags
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # chats
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # users
+    return s.get_bytes()
+
+def handle_messages_get_chats(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_messages_chats([])
+
+def handle_messages_get_common_chats(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_messages_chats([])
+
+def handle_messages_get_web_page(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xeb1477e8)  # webPageNotModified
+    s.write_int32(0)  # flags
+    return s.get_bytes()
+
+def handle_messages_get_web_page_preview(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xeb1477e8)  # webPageNotModified
+    s.write_int32(0)
+    return s.get_bytes()
+
+def handle_messages_get_message_edit_data(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x26b5dde6)  # messages.messageEditData
+    s.write_int32(0)  # flags
+    return s.get_bytes()
+
+def handle_messages_get_messages_views(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xb6c4f543)  # messages.messageViews
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # views
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # chats
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # users
+    return s.get_bytes()
+
+def handle_messages_get_attached_stickers(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # vector<StickerSetCovered>
+    return s.get_bytes()
+
+def handle_messages_get_saved_gifs(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xe8025ca2)  # messages.savedGifsNotModified
+    return s.get_bytes()
+
+def handle_messages_get_featured_stickers(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xc6dc0c66)  # messages.featuredStickersNotModified
+    s.write_int32(0)  # count
+    return s.get_bytes()
+
+def handle_messages_get_mask_stickers(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xf1749a22)  # messages.allStickersNotModified
+    return s.get_bytes()
+
+def handle_messages_get_all_chats(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_messages_chats([])
+
+def handle_messages_get_onlines(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xf49d7eb6)  # chatOnlines
+    s.write_int32(0)  # onlines count
+    return s.get_bytes()
+
+def handle_messages_get_available_reactions(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x9f071957)  # messages.availableReactionsNotModified
+    return s.get_bytes()
+
+def handle_messages_get_unread_mentions(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_messages_messages([], [], [])
+
+def handle_messages_read_mentions(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_affected_history(0, 0)
+
+def handle_messages_get_search_counters(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # vector<messages.SearchCounter>
+    return s.get_bytes()
+
+def handle_messages_get_extended_media(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_updates_empty()
+
+def handle_messages_get_emoji_groups(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x6fb4ad87)  # messages.emojiGroupsNotModified
+    return s.get_bytes()
+
+def handle_messages_get_emoji_sticker_groups(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x6fb4ad87)  # messages.emojiGroupsNotModified
+    return s.get_bytes()
+
+def handle_messages_get_available_effects(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xd1ed9a5b)  # messages.availableEffectsNotModified
+    return s.get_bytes()
+
+def handle_messages_toggle_peer_translations(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_messages_get_pinned_dialogs(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xd63a1b4b)  # messages.peerDialogs
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # dialogs
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # messages
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # chats
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # users
+    # state
+    s.write_uint32(0xa56c2a3e)  # updates.state
+    s.write_int32(0); s.write_int32(0); s.write_int32(int(time.time()))
+    s.write_int32(0); s.write_int32(0)
+    return s.get_bytes()
+
+def handle_messages_toggle_dialog_pin(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_messages_reorder_pinned_dialogs(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_messages_read_featured_stickers(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_messages_get_archived_stickers(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x4fcba9c8)  # messages.archivedStickers
+    s.write_int32(0)  # count
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # sets
+    return s.get_bytes()
+
+def handle_messages_set_game_score(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_updates_empty()
+
+def handle_messages_get_game_high_scores(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x9a3bfd99)  # messages.highScores
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # scores
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # users
+    return s.get_bytes()
+
+def handle_messages_get_unread_reactions(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_messages_messages([], [], [])
+
+def handle_messages_read_reactions(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_affected_history(0, 0)
+
+def handle_messages_report_spam(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_messages_report(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_messages_get_default_history_ttl(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x43b46b20)  # defaultHistoryTTL
+    s.write_int32(0)  # period (0 = disabled)
+    return s.get_bytes()
+
+def handle_messages_set_default_history_ttl(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_messages_send_bot_requested_peer(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_updates_empty()
+
+def handle_messages_hide_all_chat_join_requests(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_updates_empty()
+
+# --- Contacts additional stubs ---
+
+def handle_contacts_get_top_peers(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xb52c939d)  # contacts.topPeersDisabled
+    return s.get_bytes()
+
+def handle_contacts_reset_top_peer_rating(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_contacts_get_located(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_updates_empty()
+
+def handle_contacts_get_saved(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # empty vector
+    return s.get_bytes()
+
+def handle_contacts_toggle_top_peers(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+# --- Channels additional stubs ---
+
+def handle_channels_get_admin_log(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xed8af74d)  # channels.adminLogResults
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # events
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # chats
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # users
+    return s.get_bytes()
+
+def handle_channels_read_history(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_channels_delete_messages(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_affected_messages(0, 0)
+
+def handle_channels_read_message_contents(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_channels_toggle_signatures(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_updates_empty()
+
+def handle_channels_toggle_slow_mode(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_updates_empty()
+
+def handle_channels_get_send_as(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xf496b0c6)  # channels.sendAsPeers
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # peers
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # chats
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # users
+    return s.get_bytes()
+
+def handle_channels_get_inactive_channels(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xa68b0b97)  # messages.inactiveChats
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # dates
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # chats
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # users
+    return s.get_bytes()
+
+def handle_channels_toggle_join_to_send(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_updates_empty()
+
+def handle_channels_toggle_join_request(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_updates_empty()
+
+# --- Help additional stubs ---
+
+def handle_help_get_premium_promo(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x8a4f3c29)  # help.premiumPromo
+    s.write_string("")  # status_text
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # status_entities
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # video_sections
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # videos
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # period_options
+    s.write_uint32(0x1cb5c415); s.write_int32(0)  # users
+    return s.get_bytes()
+
+def handle_help_dismiss_suggestion(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_help_get_support(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x17c6b5f6)  # help.support
+    s.write_string("Custom Server Support")
+    # user (minimal)
+    s.write_uint32(0x215c4438)  # user
+    s.write_int32(0)  # flags
+    s.write_int64(777000)  # id
+    s.write_int64(0)  # access_hash
+    s.write_string("Support")
+    s.write_string("")
+    s.write_string("support")
+    s.write_string("")  # phone
+    return s.get_bytes()
+
+def handle_help_get_invite_text(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x18cb9f78)  # help.inviteText
+    s.write_string("Join our messenger!")
+    return s.get_bytes()
+
+def handle_help_save_app_log(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_help_get_passport_config(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0xbfb9f457)  # help.passportConfigNotModified
+    return s.get_bytes()
+
+def handle_help_get_deep_link_info(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x66afa166)  # help.deepLinkInfoEmpty
+    return s.get_bytes()
+
+def handle_help_get_support_name(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x8c05f1c9)  # help.supportName
+    s.write_string("Custom Server")
+    return s.get_bytes()
+
+def handle_help_get_promo_data(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x98f6ac75)  # help.promoDataEmpty
+    s.write_int32(int(time.time()) + 86400)  # expires
+    return s.get_bytes()
+
+def handle_help_hide_promo_data(data: bytes, ctx: RPCContext) -> bytes:
+    return R.build_bool(True)
+
+def handle_help_get_peer_colors(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x2ba1f5ce)  # help.peerColorsNotModified
+    return s.get_bytes()
+
+def handle_help_get_peer_profile_colors(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x2ba1f5ce)  # help.peerColorsNotModified
+    return s.get_bytes()
+
+def handle_help_get_timezones_list(data: bytes, ctx: RPCContext) -> bytes:
+    s = TLSerializer()
+    s.write_uint32(0x970708cc)  # help.timezonesListNotModified
+    return s.get_bytes()
+
+
+# ============================================================
 # HANDLERS map
 # ============================================================
 
@@ -2165,4 +2549,92 @@ HANDLERS = {
     C.ACCOUNT_GET_ACCOUNT_TTL: handle_account_get_account_ttl,
     C.ACCOUNT_SET_GLOBAL_PRIVACY_SETTINGS: handle_account_set_global_privacy_settings,
     C.ACCOUNT_GET_GLOBAL_PRIVACY_SETTINGS: handle_account_get_global_privacy_settings,
+
+    # Account (additional)
+    C.ACCOUNT_GET_NOTIFY_SETTINGS: handle_account_get_notify_settings,
+    C.ACCOUNT_UPDATE_NOTIFY_SETTINGS: handle_account_update_notify_settings,
+    C.ACCOUNT_GET_NOTIFY_EXCEPTIONS: handle_account_get_notify_exceptions,
+    C.ACCOUNT_GET_CONTACT_SIGN_UP_NOTIFICATION: handle_account_get_contact_sign_up_notification,
+    C.ACCOUNT_SET_CONTACT_SIGN_UP_NOTIFICATION: handle_account_set_contact_sign_up_notification,
+    C.ACCOUNT_GET_DEFAULT_EMOJI_STATUSES: handle_account_get_default_emoji_statuses,
+    C.ACCOUNT_GET_THEMES: handle_account_get_themes,
+    C.ACCOUNT_GET_CONTENT_SETTINGS: handle_account_get_content_settings,
+    C.ACCOUNT_CONFIRM_PHONE: handle_account_confirm_phone,
+    C.ACCOUNT_RESET_AUTHORIZATION: handle_account_reset_authorization,
+    C.ACCOUNT_GET_SAVED_RINGTONES: handle_account_get_saved_ringtones,
+    C.ACCOUNT_GET_CHANNEL_DEFAULT_EMOJI_STATUSES: handle_account_get_channel_default_emoji_statuses,
+    C.ACCOUNT_GET_RECENT_EMOJI_STATUSES: handle_account_get_recent_emoji_statuses,
+
+    # Messages (additional)
+    C.MESSAGES_GET_PEER_SETTINGS: handle_messages_get_peer_settings,
+    C.MESSAGES_GET_CHATS: handle_messages_get_chats,
+    C.MESSAGES_GET_COMMON_CHATS: handle_messages_get_common_chats,
+    C.MESSAGES_GET_WEB_PAGE: handle_messages_get_web_page,
+    C.MESSAGES_GET_WEB_PAGE_PREVIEW: handle_messages_get_web_page_preview,
+    C.MESSAGES_GET_MESSAGE_EDIT_DATA: handle_messages_get_message_edit_data,
+    C.MESSAGES_GET_MESSAGES_VIEWS: handle_messages_get_messages_views,
+    C.MESSAGES_GET_ATTACHED_STICKERS: handle_messages_get_attached_stickers,
+    C.MESSAGES_GET_SAVED_GIFS: handle_messages_get_saved_gifs,
+    C.MESSAGES_GET_FEATURED_STICKERS: handle_messages_get_featured_stickers,
+    C.MESSAGES_GET_MASK_STICKERS: handle_messages_get_mask_stickers,
+    C.MESSAGES_GET_ALL_CHATS: handle_messages_get_all_chats,
+    C.MESSAGES_GET_ONLINES: handle_messages_get_onlines,
+    C.MESSAGES_GET_AVAILABLE_REACTIONS: handle_messages_get_available_reactions,
+    C.MESSAGES_GET_UNREAD_MENTIONS: handle_messages_get_unread_mentions,
+    C.MESSAGES_READ_MENTIONS: handle_messages_read_mentions,
+    C.MESSAGES_GET_SEARCH_COUNTERS: handle_messages_get_search_counters,
+    C.MESSAGES_GET_EXTENDED_MEDIA: handle_messages_get_extended_media,
+    C.MESSAGES_GET_EMOJI_GROUPS: handle_messages_get_emoji_groups,
+    C.MESSAGES_GET_EMOJI_STICKER_GROUPS: handle_messages_get_emoji_sticker_groups,
+    C.MESSAGES_GET_AVAILABLE_EFFECTS: handle_messages_get_available_effects,
+    C.MESSAGES_TOGGLE_PEER_TRANSLATIONS: handle_messages_toggle_peer_translations,
+    C.MESSAGES_GET_PINNED_DIALOGS: handle_messages_get_pinned_dialogs,
+    C.MESSAGES_TOGGLE_DIALOG_PIN: handle_messages_toggle_dialog_pin,
+    C.MESSAGES_REORDER_PINNED_DIALOGS: handle_messages_reorder_pinned_dialogs,
+    C.MESSAGES_READ_FEATURED_STICKERS: handle_messages_read_featured_stickers,
+    C.MESSAGES_GET_ARCHIVED_STICKERS: handle_messages_get_archived_stickers,
+    C.MESSAGES_SET_GAME_SCORE: handle_messages_set_game_score,
+    C.MESSAGES_GET_GAME_HIGH_SCORES: handle_messages_get_game_high_scores,
+    C.MESSAGES_GET_UNREAD_REACTIONS: handle_messages_get_unread_reactions,
+    C.MESSAGES_READ_REACTIONS: handle_messages_read_reactions,
+    C.MESSAGES_REPORT_SPAM: handle_messages_report_spam,
+    C.MESSAGES_REPORT: handle_messages_report,
+    C.MESSAGES_GET_DEFAULT_HISTORY_TTL: handle_messages_get_default_history_ttl,
+    C.MESSAGES_SET_DEFAULT_HISTORY_TTL: handle_messages_set_default_history_ttl,
+    C.MESSAGES_SEND_BOT_REQUESTED_PEER: handle_messages_send_bot_requested_peer,
+    C.MESSAGES_HIDE_ALL_CHAT_JOIN_REQUESTS: handle_messages_hide_all_chat_join_requests,
+
+    # Contacts (additional)
+    C.CONTACTS_GET_TOP_PEERS: handle_contacts_get_top_peers,
+    C.CONTACTS_RESET_TOP_PEER_RATING: handle_contacts_reset_top_peer_rating,
+    C.CONTACTS_GET_LOCATED: handle_contacts_get_located,
+    C.CONTACTS_GET_SAVED: handle_contacts_get_saved,
+    C.CONTACTS_TOGGLE_TOP_PEERS: handle_contacts_toggle_top_peers,
+
+    # Channels (additional)
+    C.CHANNELS_GET_ADMIN_LOG: handle_channels_get_admin_log,
+    C.CHANNELS_READ_HISTORY: handle_channels_read_history,
+    C.CHANNELS_DELETE_MESSAGES: handle_channels_delete_messages,
+    C.CHANNELS_READ_MESSAGE_CONTENTS: handle_channels_read_message_contents,
+    C.CHANNELS_TOGGLE_SIGNATURES: handle_channels_toggle_signatures,
+    C.CHANNELS_TOGGLE_SLOW_MODE: handle_channels_toggle_slow_mode,
+    C.CHANNELS_GET_SEND_AS: handle_channels_get_send_as,
+    C.CHANNELS_GET_INACTIVE_CHANNELS: handle_channels_get_inactive_channels,
+    C.CHANNELS_TOGGLE_JOIN_TO_SEND: handle_channels_toggle_join_to_send,
+    C.CHANNELS_TOGGLE_JOIN_REQUEST: handle_channels_toggle_join_request,
+
+    # Help (additional)
+    C.HELP_GET_PREMIUM_PROMO: handle_help_get_premium_promo,
+    C.HELP_DISMISS_SUGGESTION: handle_help_dismiss_suggestion,
+    C.HELP_GET_SUPPORT: handle_help_get_support,
+    C.HELP_GET_INVITE_TEXT: handle_help_get_invite_text,
+    C.HELP_SAVE_APP_LOG: handle_help_save_app_log,
+    C.HELP_GET_PASSPORT_CONFIG: handle_help_get_passport_config,
+    C.HELP_GET_DEEP_LINK_INFO: handle_help_get_deep_link_info,
+    C.HELP_GET_SUPPORT_NAME: handle_help_get_support_name,
+    C.HELP_GET_PROMO_DATA: handle_help_get_promo_data,
+    C.HELP_HIDE_PROMO_DATA: handle_help_hide_promo_data,
+    C.HELP_GET_PEER_COLORS: handle_help_get_peer_colors,
+    C.HELP_GET_PEER_PROFILE_COLORS: handle_help_get_peer_profile_colors,
+    C.HELP_GET_TIMEZONES_LIST: handle_help_get_timezones_list,
 }

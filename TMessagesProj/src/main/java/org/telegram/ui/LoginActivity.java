@@ -5957,6 +5957,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             signInWithGoogleView.setLineSpacing(AndroidUtilities.dp(2), 1.0f);
             signInWithGoogleView.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16));
             signInWithGoogleView.setMaxLines(2);
+            // Hide Google Sign-In when no client ID configured (custom server)
+            if (TextUtils.isEmpty(BuildVars.GOOGLE_AUTH_CLIENT_ID)) {
+                signInWithGoogleView.setVisibility(View.GONE);
+            }
 
             SpannableStringBuilder str = new SpannableStringBuilder("d ");
             Drawable dr = ContextCompat.getDrawable(context, R.drawable.googleg_standard_color_18);
@@ -5987,6 +5991,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             VerticalPositionAutoAnimator.attach(bottomContainer);
 
             bottomContainer.setOnClickListener(view -> {
+                // Stub: Google Sign-In disabled — custom server, no GOOGLE_AUTH_CLIENT_ID
+                if (TextUtils.isEmpty(BuildVars.GOOGLE_AUTH_CLIENT_ID)) {
+                    return;
+                }
                 NotificationCenter.getGlobalInstance().addObserver(new NotificationCenter.NotificationCenterDelegate() {
                     @Override
                     public void didReceivedNotification(int id, int account, Object... args) {
