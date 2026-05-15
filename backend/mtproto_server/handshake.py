@@ -107,10 +107,39 @@ def handle_req_dh_params(data: bytes, state: HandshakeState) -> bytes:
     # Decrypt the encrypted_data with RSA
     decrypted = crypto.rsa_decrypt(encrypted_data)
 
-    # Parse the inner data: SHA1(data) + data + padding
-    inner_hash = decrypted[:20]
-    inner_data_start = 20
-    inner_reader = TLDeserializer(decrypted[inner_data_start:])
+    # MTProto 2.0 RSA padding format:
+    # decrypted = key_aes_encrypted(32) + aes_encrypted_data(224)
+    # key_hash = SHA256(aes_encrypted_data)
+    # key = key_aes_encrypted XOR key_hash
+    # AES-IGE decrypt aes_encrypted_data with key and iv=zeros(32)
+    # result = reversed_padded_data(192) + data_hash(32)
+    # padded_data = reverse(reversed_padded_data)
+    # inner_data is at the start of padded_data
+    key_aes_encrypted = decrypted[:32]
+    aes_encrypted_data = decrypted[32:]
+
+    key_hash = hashlib.sha256(aes_encrypted_data).digest()
+    key = bytes(a ^ b for a, b in zip(key_aes_encrypted, key_hash))
+
+    iv = b'\x00' * 32
+    aes_decrypted = crypto.aes_ige_decrypt(aes_encrypted_data, key, iv)
+
+    reversed_padded_data = aes_decrypted[:192]
+    data_hash = aes_decrypted[192:224]
+
+    # Reverse to get padded_data
+    padded_data = bytes(reversed(reversed_padded_data))
+
+    # Verify hash
+    expected_hash = hashlib.sha256(key + padded_data).digest()
+    if data_hash != expected_hash:
+        logger.warning("RSA inner data hash mismatch, trying legacy format")
+        # Fallback to legacy MTProto 1.0 format: SHA1(data) + data + padding
+        inner_reader = TLDeserializer(decrypted[20:])
+    else:
+        # Parse padded_data - inner data starts at beginning
+        inner_reader = TLDeserializer(padded_data)
+
     inner_constructor = inner_reader.read_uint32()
 
     # Read p_q_inner_data fields
@@ -124,8 +153,18 @@ def handle_req_dh_params(data: bytes, state: HandshakeState) -> bytes:
     state.new_nonce = new_nonce
     state.is_temp_key = inner_constructor in (CID_P_Q_INNER_DATA_TEMP, CID_P_Q_INNER_DATA_TEMP_DC)
 
+    # DC variants have a dc field after new_nonce, before expires_in
+    if inner_constructor in (CID_P_Q_INNER_DATA_DC, CID_P_Q_INNER_DATA_TEMP_DC):
+        try:
+            dc_id = inner_reader.read_int32()
+        except Exception:
+            pass
+
     if state.is_temp_key:
-        state.temp_key_expires_in = inner_reader.read_int32()
+        try:
+            state.temp_key_expires_in = inner_reader.read_int32()
+        except Exception:
+            state.temp_key_expires_in = 86400
 
     # Generate DH parameters
     state.dh_b, g_b_int = crypto.generate_dh_params()

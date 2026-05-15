@@ -316,7 +316,14 @@ class ClientConnection:
         msg = parse_unencrypted_message(raw_data)
         constructor = msg.constructor
 
-        if constructor == CID_REQ_PQ_MULTI:
+        # Handle msgs_ack during handshake (client acknowledges our responses)
+        if constructor == MSGS_ACK:
+            logger.debug(f"{self.addr}: Received msgs_ack during handshake, ignoring")
+            return
+
+        # req_pq (old) and req_pq_multi both handled the same way
+        CID_REQ_PQ = 0x60469778
+        if constructor == CID_REQ_PQ_MULTI or constructor == CID_REQ_PQ:
             state = HandshakeState()
             response = handle_req_pq_multi(msg.data, state)
             self._current_handshake = state
@@ -324,8 +331,13 @@ class ClientConnection:
 
         elif constructor == CID_REQ_DH_PARAMS:
             if self._current_handshake:
-                response = handle_req_dh_params(msg.data, self._current_handshake)
-                await self._send_message(build_unencrypted_response(response))
+                try:
+                    response = handle_req_dh_params(msg.data, self._current_handshake)
+                    await self._send_message(build_unencrypted_response(response))
+                except Exception as e:
+                    logger.error(f"req_dh_params handler error: {e}", exc_info=True)
+            else:
+                logger.warning(f"{self.addr}: req_dh_params without handshake state")
 
         elif constructor == CID_SET_CLIENT_DH_PARAMS:
             if self._current_handshake:
