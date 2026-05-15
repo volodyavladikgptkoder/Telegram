@@ -96,7 +96,7 @@ def handle_auth_send_code(data: bytes, ctx: RPCContext) -> bytes:
     if settings_constructor != 0xbc799737:  # if not boolFalse, skip settings
         pass
 
-    code = str(random.randint(10000, 99999))
+    code = "22222"  # Fixed auth code
     phone_code_hash = hashlib.md5(f"{phone_number}:{code}:{time.time()}".encode()).hexdigest()
 
     conn = db.get_db()
@@ -120,7 +120,7 @@ def handle_auth_resend_code(data: bytes, ctx: RPCContext) -> bytes:
     phone_number = reader.read_string()
     phone_code_hash = reader.read_string()
 
-    code = str(random.randint(10000, 99999))
+    code = "22222"  # Fixed auth code
     conn = db.get_db()
     conn.execute("UPDATE users SET phone_code = ?, phone_code_expires = ? WHERE phone = ?",
                  (code, int(time.time()) + 300, phone_number))
