@@ -100,21 +100,17 @@ def handle_req_dh_params(data: bytes, state: HandshakeState) -> bytes:
     fingerprint = reader.read_int64()
     encrypted_data = reader.read_bytes()
 
+    logger.info(f"req_dh_params: encrypted_data_len={len(encrypted_data)}, fingerprint=0x{fingerprint & 0xFFFFFFFFFFFFFFFF:016x}")
+
     if nonce != state.nonce or server_nonce != state.server_nonce:
-        logger.error("Nonce mismatch in req_DH_params")
+        logger.error(f"Nonce mismatch in req_DH_params: nonce_match={nonce == state.nonce}, sn_match={server_nonce == state.server_nonce}")
         return _build_dh_params_fail(state)
 
     # Decrypt the encrypted_data with RSA
     decrypted = crypto.rsa_decrypt(encrypted_data)
+    logger.info(f"RSA decrypted: len={len(decrypted)}, first16={decrypted[:16].hex()}")
 
     # MTProto 2.0 RSA padding format:
-    # decrypted = key_aes_encrypted(32) + aes_encrypted_data(224)
-    # key_hash = SHA256(aes_encrypted_data)
-    # key = key_aes_encrypted XOR key_hash
-    # AES-IGE decrypt aes_encrypted_data with key and iv=zeros(32)
-    # result = reversed_padded_data(192) + data_hash(32)
-    # padded_data = reverse(reversed_padded_data)
-    # inner_data is at the start of padded_data
     key_aes_encrypted = decrypted[:32]
     aes_encrypted_data = decrypted[32:]
 
@@ -127,22 +123,21 @@ def handle_req_dh_params(data: bytes, state: HandshakeState) -> bytes:
     reversed_padded_data = aes_decrypted[:192]
     data_hash = aes_decrypted[192:224]
 
-    # Reverse to get padded_data
     padded_data = bytes(reversed(reversed_padded_data))
 
-    # Verify hash
     expected_hash = hashlib.sha256(key + padded_data).digest()
-    if data_hash != expected_hash:
+    hash_ok = data_hash == expected_hash
+    logger.info(f"MTProto 2.0 hash verification: {hash_ok}")
+
+    if not hash_ok:
         logger.warning("RSA inner data hash mismatch, trying legacy format")
-        # Fallback to legacy MTProto 1.0 format: SHA1(data) + data + padding
         inner_reader = TLDeserializer(decrypted[20:])
     else:
-        # Parse padded_data - inner data starts at beginning
         inner_reader = TLDeserializer(padded_data)
 
     inner_constructor = inner_reader.read_uint32()
+    logger.info(f"Inner constructor: 0x{inner_constructor:08x}")
 
-    # Read p_q_inner_data fields
     inner_pq = inner_reader.read_bytes()
     inner_p = inner_reader.read_bytes()
     inner_q = inner_reader.read_bytes()
@@ -150,13 +145,16 @@ def handle_req_dh_params(data: bytes, state: HandshakeState) -> bytes:
     inner_server_nonce = inner_reader.read_int128()
     new_nonce = inner_reader.read_int256()
 
+    logger.info(f"Inner nonce match: {inner_nonce == state.nonce}, inner_sn match: {inner_server_nonce == state.server_nonce}")
+    logger.info(f"new_nonce: {new_nonce[:8].hex()}..., is_temp={inner_constructor in (CID_P_Q_INNER_DATA_TEMP, CID_P_Q_INNER_DATA_TEMP_DC)}")
+
     state.new_nonce = new_nonce
     state.is_temp_key = inner_constructor in (CID_P_Q_INNER_DATA_TEMP, CID_P_Q_INNER_DATA_TEMP_DC)
 
-    # DC variants have a dc field after new_nonce, before expires_in
     if inner_constructor in (CID_P_Q_INNER_DATA_DC, CID_P_Q_INNER_DATA_TEMP_DC):
         try:
             dc_id = inner_reader.read_int32()
+            logger.info(f"DC ID: {dc_id}")
         except Exception:
             pass
 
@@ -166,16 +164,14 @@ def handle_req_dh_params(data: bytes, state: HandshakeState) -> bytes:
         except Exception:
             state.temp_key_expires_in = 86400
 
-    # Generate DH parameters
     state.dh_b, g_b_int = crypto.generate_dh_params()
     state.g_b = g_b_int
 
-    # Compute tmp_aes_key and tmp_aes_iv
     tmp_aes_key, tmp_aes_iv = _compute_tmp_aes(state.server_nonce, new_nonce)
     state.tmp_aes_key = tmp_aes_key
     state.tmp_aes_iv = tmp_aes_iv
+    logger.info(f"tmp_aes_key len={len(tmp_aes_key)}, tmp_aes_iv len={len(tmp_aes_iv)}")
 
-    # Build server_DH_inner_data
     inner_writer = TLSerializer()
     inner_writer.write_uint32(CID_SERVER_DH_INNER_DATA)
     inner_writer.write_int128(state.nonce)
@@ -183,26 +179,25 @@ def handle_req_dh_params(data: bytes, state: HandshakeState) -> bytes:
     inner_writer.write_int32(crypto.DH_GENERATOR)
     inner_writer.write_bytes(long_to_bytes(crypto.DH_PRIME, 256))
     inner_writer.write_bytes(long_to_bytes(g_b_int, 256))
-    inner_writer.write_int32(int(import_time()))  # server_time
+    inner_writer.write_int32(int(import_time()))
 
     inner_bytes = inner_writer.get_bytes()
 
-    # SHA1(inner_data) + inner_data + random padding to align to 16
     inner_hash = hashlib.sha1(inner_bytes).digest()
     answer_data = inner_hash + inner_bytes
     padding_len = (16 - len(answer_data) % 16) % 16
     answer_data += os.urandom(padding_len)
+    logger.info(f"DH answer_data len={len(answer_data)} (before encrypt)")
 
-    # Encrypt with AES-IGE using tmp_aes_key/iv
     encrypted_answer = crypto.aes_ige_encrypt(answer_data, tmp_aes_key, tmp_aes_iv)
 
-    # Build response
     writer = TLSerializer()
     writer.write_uint32(CID_SERVER_DH_PARAMS_OK)
     writer.write_int128(state.nonce)
     writer.write_int128(state.server_nonce)
     writer.write_bytes(encrypted_answer)
 
+    logger.info(f"server_DH_params_ok response built, len={len(writer.get_bytes())}")
     return writer.get_bytes()
 
 

@@ -319,10 +319,11 @@ class ClientConnection:
         """Handle unencrypted messages during handshake."""
         msg = parse_unencrypted_message(raw_data)
         constructor = msg.constructor
+        logger.info(f"{self.addr}: Unencrypted constructor=0x{constructor:08x}, data_len={len(msg.data)}")
 
         # Handle msgs_ack during handshake (client acknowledges our responses)
         if constructor == MSGS_ACK:
-            logger.debug(f"{self.addr}: Received msgs_ack during handshake, ignoring")
+            logger.info(f"{self.addr}: Received msgs_ack during handshake, ignoring")
             return
 
         # req_pq (old) and req_pq_multi both handled the same way
